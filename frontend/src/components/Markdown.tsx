@@ -26,6 +26,18 @@ function inline(text: string): (string | JSX.Element)[] {
   return parts.length ? parts : [text];
 }
 
+// Transcript speaker turns are "N. SPEAKER: text" — one physical line each.
+// Findings reference these line numbers, so the number stays visible in a gutter.
+const TURN = /^(\d+)\.\s+([A-Z][A-Z_]{1,30}):\s+(.*)$/;
+
+const SPEAKER_COLORS = ["#a8c7ff", "#7ee2a8", "#ffd98e", "#c3a8fe", "#8fd8e8", "#f2b8c6"];
+
+function speakerColor(name: string): string {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
+  return SPEAKER_COLORS[hash % SPEAKER_COLORS.length];
+}
+
 function splitRow(line: string): string[] {
   return line.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
 }
@@ -107,6 +119,24 @@ export function Markdown({ source }: { source: string }) {
               ))}
             </tbody>
           </table>
+        </div>
+      );
+      continue;
+    }
+
+    const turn = TURN.exec(trimmed);
+    if (turn) {
+      flush();
+      const speaker = turn[2].replace(/_/g, " ");
+      out.push(
+        <div className="turn" key={key++}>
+          <span className="turn__line">{turn[1]}</span>
+          <div>
+            <span className="turn__speaker" style={{ color: speakerColor(turn[2]) }}>
+              {speaker}
+            </span>
+            <p className="turn__text">{inline(turn[3])}</p>
+          </div>
         </div>
       );
       continue;
