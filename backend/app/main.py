@@ -95,7 +95,13 @@ def run_analysis(req: AnalyzeRequest) -> AnalysisResult:
     # Enrichment runs first so its source-cited leads feed the orchestrator;
     # it degrades to empty if there's no API key, so analysis still runs.
     enrichment = enrich(case, transcript, free_text)
-    return analyze(case, transcript, enrichment)
+    try:
+        return analyze(case, transcript, enrichment)
+    except RuntimeError as e:
+        # The orchestrator needs an API key; surface a clear 400 (config), not a 500.
+        if "ANTHROPIC_API_KEY" in str(e):
+            raise HTTPException(status_code=400, detail=str(e).splitlines()[0])
+        raise
 
 
 @app.get("/cases", response_model=list[CaseSummary])
