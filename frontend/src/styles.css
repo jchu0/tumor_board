@@ -1,0 +1,64 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --muted: #8b93a1;
+  --accent: #6ea8fe;
+  --warn: #f0b429;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+
+.app { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+.app__head { display: flex; align-items: center; justify-content: space-between; }
+.app__head button {
+  background: var(--accent); color: #0b1020; border: 0; padding: 0.6rem 1.1rem;
+  border-radius: 8px; font-weight: 600; cursor: pointer;
+}
+.app__head button:disabled { opacity: 0.6; cursor: default; }
+
+.layout { display: grid; grid-template-columns: 1fr 1.4fr; gap: 1rem; margin-top: 1rem; }
+.findings-col { display: flex; flex-direction: column; gap: 1rem; }
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+.panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+
+.tline { margin: 0.35rem 0; font-size: 0.9rem; line-height: 1.4; }
+.tline__meta { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+.finding { border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.75rem; }
+.finding--warn { border-color: var(--warn); }
+.finding__head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.finding__source { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; margin-right: auto; }
+.finding__issue { margin: 0.5rem 0 0.25rem; font-size: 1rem; }
+.finding__rec { margin: 0 0 0.5rem; }
+.finding__patient { margin: 0.5rem 0; font-size: 0.9rem; color: #cfd4dc; }
+.finding__live { background: #10233f; border-left: 3px solid var(--accent); padding: 0.5rem 0.6rem; border-radius: 4px; font-size: 0.9rem; }
+.finding__foot { display: flex; flex-wrap: wrap; gap: 0.75rem; color: var(--muted); font-size: 0.75rem; margin-top: 0.6rem; }
+
+.badge { font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 999px; border: 1px solid var(--border); }
+.badge--grade { background: #14321f; color: #7ee2a8; }
+.badge--match { background: #1a2740; color: var(--accent); }
+.badge--op-not_confirmed { background: #3a2c10; color: var(--warn); }
+.badge--op-cleared { background: #14321f; color: #7ee2a8; }
+
+.ledger { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.ledger th, .ledger td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ledger th { color: var(--muted); font-weight: 600; }
+
+.error { background: #3a1417; border: 1px solid #6b2130; color: #ffb4bd; padding: 0.6rem 0.8rem; border-radius: 8px; margin-top: 0.75rem; }
+.empty { color: var(--muted); }
+.gaps { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.88rem; }
+.gaps li { margin: 0.25rem 0; }
+.gaps code { background: #10233f; color: var(--accent); padding: 0.05rem 0.3rem; border-radius: 4px; }
+
+/* Inferred context — deliberately distinct from grounded findings. */
+.inferred { border: 1px dashed var(--border); border-radius: 10px; padding: 0.75rem; margin-bottom: 0.6rem; }
+.inferred__head { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.inferred__summary { margin: 0.5rem 0 0.4rem; }
+.inferred__quote { margin: 0; padding: 0.4rem 0.7rem; border-left: 3px solid var(--muted); color: #cfd4dc; font-style: italic; font-size: 0.88rem; }
+.inferred__quote cite { display: block; font-style: normal; color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
+.badge--kind { background: #241a40; color: #c3a8fe; }
