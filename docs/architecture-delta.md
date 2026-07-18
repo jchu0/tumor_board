@@ -5,8 +5,9 @@
 > copied alongside it to **`docs/stage-interface-contract.yaml`**; the advisor's full
 > working artifacts stay local in `.boilerplate/` (gitignored) by design. One factual
 > correction was applied to §4.1 residual gap 1 — model-initiated operability results
-> *are* captured (`orchestrator.py:251`); the original claim was verified stale against
-> current code. Marked inline.
+> *are* captured (`orchestrator.py:285`); the original claim was verified stale against
+> current code. Marked inline. Re-audited 2026-07-18 after the integration pass:
+> line refs, test counts, and §6 defect states refreshed against current code.
 
 **Decision (2026-07-18): ADOPTED.** The two-person Stage 2 / Stage 3 split described here is the
 agreed go-forward architecture. `docs/stage-interface-contract.yaml` is `status: ACCEPTED` and is the
@@ -15,10 +16,10 @@ authoritative seam. Ownership: **Stage 2 (patient data structuring + transcript)
 being migrated toward this shape; sections below mark what exists vs. what is still to build.
 
 **Status:** partially implemented. `README.md` remains the historical spec; this file is the delta
-against it. The enrichment pass (§5) is **built and tested** — full suite 63/63 passing. The
+against it. The enrichment pass (§5) is **built and tested** — full suite 83/83 passing. The
 Stage 2 / Stage 3 seam (§3) is **adopted; the Stage 2 side is scaffolded** (schema + adapter + golden
-fixture, 18 contract tests) while Stage 3's guidance-as-input is not started. Each section marks its
-own state.
+fixture, 18 contract tests; plus a per-patient folder loader with cross-patient isolation, 7 tests)
+while Stage 3's guidance-as-input is not started. Each section marks its own state.
 
 **Audience:** the two component owners. Read this before writing code against the other person's half.
 
@@ -61,9 +62,9 @@ transcript file ─────────────────────�
 | Stage | What it is | Owner | State |
 |---|---|---|---|
 | **1** | Live STT feed | — | **DESCOPED.** Static transcript file. Deferred, not cancelled. |
-| **2** | Patient data structuring — files/folder → `PatientCaseBundle` | James | **scaffolded** — `app/stage2/` schema + adapter, 18 contract tests, golden fixture at `fixtures/contract/v1/` |
+| **2** | Patient data structuring — files/folder → `PatientCaseBundle` | James | **scaffolded** — `app/stage2/` schema + adapter (18 contract tests, golden at `fixtures/contract/v1/`) + per-patient folder loader with cross-patient isolation (`loader.py`, 7 tests) |
 | **E** | Enrichment pre-pass — source-cited inferences that feed [3] | parallel session | **implemented** |
-| **P** | Goals-of-care precondition — gates whether guidance runs at all (§8) | — | **implemented, 23 tests** |
+| **P** | Goals-of-care precondition — gates whether guidance runs at all (§8) | — | **implemented, 33 tests** |
 | **3** | Guidance + gap assessment — deterministic join, then bounded model call | Partner | orchestrator exists; guidance-as-input not started |
 
 **Ordering note.** Enrichment is a **pre-pass** — not a parallel channel, and not a consolidator. It
@@ -93,6 +94,12 @@ and labelled; Tier 2 `check_practice_pattern` stays Tier 2.
 
 Stage 2 emits `PatientCaseBundle`. Stage 3 consumes it. **Field names and types are in
 `stage-interface-contract.yaml` — that file is authoritative, this section is orientation.**
+
+**Data intake convention (`data/README.md`):** each subfolder of `data/` is exactly one
+patient's data set. `stage2.load_patient_folder()` assembles one folder's files into one
+bundle with cross-patient isolation enforced in code — one folder → one bundle, an
+identity guard that raises rather than merge a Frankenpatient, and `case_id` = the folder
+name as the partition key. Adding demo data is zero-code: drop a new folder in.
 
 The rule that keeps the seam clean, applicable by either owner without conferring:
 
@@ -139,7 +146,7 @@ Two residual gaps, both narrow, both failing safe:
 
 1. **~~Clearance is reachable only via the enrichment path.~~ CORRECTED — resolved in current code.**
    The original assessment claimed `op_results` was seeded before the tool loop and never updated
-   inside it. Verified stale: `orchestrator.py:251` appends model-initiated `check_operability`
+   inside it. Verified stale: `orchestrator.py:285` appends model-initiated `check_operability`
    results to `op_results` inside the loop, so they accumulate across tool-use iterations and are
    present when the terminal-iteration gate runs. `cleared` is reachable via the model path.
    (With enrichment skipped and the model calling no operability tool, `op_results` is empty and
@@ -166,7 +173,7 @@ them.
 
 ## 5. The enrichment pass — IMPLEMENTED
 
-**Built and tested** (`test_enrich.py` + `test_triggered_checks.py`, 10 tests; full suite 63/63).
+**Built and tested** (`test_enrich.py` + `test_triggered_checks.py`, 10 tests; full suite 76/76).
 `backend/app/agents/`. This section describes what exists, not a proposal.
 
 **Intent:** capture nuance the deterministic path structurally cannot — performance status implied
@@ -225,31 +232,39 @@ than merely being narrated to the model.
 **Fixed and verified** (parallel session): `raises_check` unwired; grounding accepting inverted
 meaning; `raises_check` as a free string. All three confirmed in code, suite green.
 
-**Still live, silent, confirmed on disk** — all on the Stage 2 side:
+**Still live, silent, confirmed on disk:**
 
-1. **`case_schema.py:117`** documents `PriorTreatment.kind` as `'surgery' | 'systemic' | 'radiation'`,
-   but **`fhir_adapter.py:248`** hardcodes `kind="procedure"`. A Stage 3 rule matching
-   `kind == "surgery"` matches nothing, forever, with no error. Close the enum, fix the adapter.
-   *Fixed on the Stage 2 side:* `stage2/adapter.py` classifies into the closed `TreatmentKind` enum
-   (`_treatment_kind`). The defect is now confined to the pre-split ingest adapter.
+1. ~~**`case_schema.py:117`** documents `PriorTreatment.kind` as `'surgery' | 'systemic' | 'radiation'`,
+   but **`fhir_adapter.py:248`** hardcodes `kind="procedure"`.~~ **FIXED on both sides** (integration
+   pass). The vocabulary and its classifier were consolidated into dependency-free
+   `app/treatment_kinds.py` (closed `TreatmentKind` enum + `classify_treatment_kind`), imported by
+   both layers so they cannot drift: `case_schema.py:121` types `PriorTreatment.kind` as
+   `Optional[TreatmentKind]`, `fhir_adapter.py:262` classifies instead of hardcoding, and
+   `stage2/adapter.py` uses the same classifier (`_treatment_kind = classify_treatment_kind`,
+   re-exported via `stage2/enums.py`). A rule matching `kind == "surgery"` now matches real surgeries
+   in both the pre-split path and the Stage 2 bundle.
 2. **`fhir_adapter.py:131`** — `_prov()` falls back to a positional ref. Reorder the source and every
    citation silently re-points. Mint stable `element_id`s. *Fixed on the Stage 2 side:*
    `stage2/ids.py` mints stable `element_id`s; the pre-split adapter still has the fallback.
-3. **`completeness()` is still called** from `orchestrator.py:195` and `main.py:60`. Per §3 it is to
+3. **`completeness()` is still called** from `orchestrator.py:222` and `main.py:60`. Per §3 it is to
    be deleted and its five remaining checks re-authored as `GEN-*` guidance rules (its goals-of-care
    check is already gone — GOC staleness/absence now lives only in the precondition, and
    `flag_stale_data` explicitly disclaims it too). Until then, "what counts as a gap" has two owners.
 
-Also: `max_tokens=4096` with a bare `json.loads` in `orchestrator.py` means truncated output yields
-zero findings rather than partial ones. (Enrichment already degrades gracefully; the orchestrator
-does not.)
+~~Also: `max_tokens=4096` with a bare `json.loads` in `orchestrator.py` means truncated output yields
+zero findings rather than partial ones.~~ **FIXED** (integration pass): the cap is now
+`MAX_OUTPUT_TOKENS` (env-overridable, default 16000, `config.py`), `_parse` salvages every *complete*
+finding from truncated output via `_salvage_findings` (partial trailing objects are discarded, never
+guessed at), fully unreadable output becomes a loud `_unparseable_result` finding instead of an empty
+panel, and `AnalysisResult.truncated` marks the run visibly incomplete. The orchestrator now degrades
+gracefully, matching enrichment.
 
 ## 7. Open questions
 
 | # | Question | Blocks |
 |---|---|---|
 | 1 | **Who owns the guidance pack?** Under this design it holds the system's entire clinical substance — 6–12 rules, grades, `applies_when`, `intervention_class`. Currently unassigned and unreviewed. | Stage 3 — their whole build is a join against it |
-| 2 | ~~Should model-initiated `check_operability` results count toward clearance?~~ **RESOLVED in code:** they do — `orchestrator.py:251` appends them inside the tool loop, so they gate alongside enrichment-triggered ones (§4.1 correction). | — |
+| 2 | ~~Should model-initiated `check_operability` results count toward clearance?~~ **RESOLVED in code:** they do — `orchestrator.py:285` appends them inside the tool loop, so they gate alongside enrichment-triggered ones (§4.1 correction). | — |
 | 3 | Should clearance bind to a specific procedure rather than the run? (§4.2) | Stage 3 |
 | 4 | ~~`.boilerplate/` is gitignored — how does the interface contract reach both owners?~~ **RESOLVED:** contract committed to `docs/stage-interface-contract.yaml`. | — |
 
@@ -258,7 +273,7 @@ clinical content is the part no amount of architecture makes correct.
 
 ## 8. The precondition layer — IMPLEMENTED (goals of care)
 
-**Built and tested.** `backend/app/goc.py`, `backend/tests/test_goc.py` (23 tests, suite 63/63).
+**Built and tested.** `backend/app/goc.py`, `backend/tests/test_goc.py` (33 tests, suite 76/76).
 Clinical rules reviewed by the clinician partner.
 
 ### It is a layer, not a one-off
