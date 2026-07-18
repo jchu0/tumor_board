@@ -18,8 +18,12 @@ from .ids import canonical_json
 
 BUNDLE_VERSION = "1.0.0"
 
-# Optional leading "[HH:MM:SS]", then an ALL-CAPS speaker label, then the text.
-_TURN = re.compile(r"^\s*(?:\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*)?([A-Z][A-Z0-9_ ]{1,30}):\s*(.*)$")
+# Optional leading turn number ("1. ") and/or "[HH:MM:SS]", then an ALL-CAPS
+# speaker label, then the text. Handles both the plain "SPEAKER: text" form and
+# the numbered-markdown "N. SPEAKER: text" form (data/cases transcripts).
+_TURN = re.compile(
+    r"^\s*(?:\d+\.\s*)?(?:\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*)?([A-Z][A-Z0-9_ ]{1,30}):\s*(.*)$"
+)
 
 # Verbatim label -> role. Order matters: 'pathologist' before 'oncologist',
 # 'radiologist' before the generic 'onc' so 'RADIATION ONCOLOGIST' -> oncologist.

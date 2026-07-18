@@ -139,10 +139,13 @@ def _prov(resource: dict, ref: str) -> Provenance:
 
 def _status_from(text: str) -> TriState:
     t = text.lower()
+    # Negatives FIRST — otherwise "no mutation detected" matches "detected" and
+    # inverts to positive. Negation-bearing phrases win over the bare tokens.
+    if any(w in t for w in ("negative", "not detected", "no mutation", "not amplified",
+                            "wild", "absent", "no evidence")):
+        return TriState.negative
     if any(w in t for w in ("positive", "detected", "high", "amplified", "mutant")):
         return TriState.positive
-    if any(w in t for w in ("negative", "not detected", "wild", "absent")):
-        return TriState.negative
     if "equivocal" in t or "indeterminate" in t:
         return TriState.equivocal
     return TriState.unknown

@@ -6,6 +6,7 @@ judgment; the word "gap" never appears here. See `to_bundle`.
 """
 from .adapter import to_bundle
 from .bundle import PatientCaseBundle
+from .extract import bundle_from_case, load_case_bundle
 from .loader import (
     MixedPatientDataError,
     discover_patients,
@@ -19,6 +20,8 @@ from .transcript import TranscriptBundle, to_transcript_bundle
 __all__ = [
     "to_bundle",
     "PatientCaseBundle",
+    "bundle_from_case",
+    "load_case_bundle",
     "TranscriptBundle",
     "to_transcript_bundle",
     "load_patient_folder",

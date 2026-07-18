@@ -108,6 +108,13 @@ def _handle_observation(res: dict, bld: _Builder) -> bool:
         return True
 
     gene = next((g for g in _BIOMARKERS if g in low), None)
+    # Guard the eGFR (kidney lab, estimated GFR) vs EGFR (gene) collision: only
+    # treat an EGFR match as the gene if the value actually reads molecular.
+    if gene == "egfr" and not any(
+        w in (val or "").lower()
+        for w in ("mutation", "positive", "negative", "detected", "deletion", "exon", "amplif", "wild", "mutant")
+    ):
+        gene = None
     if gene or "mutation" in low or "biomarker" in low or "tps" in low:
         eid = bld.eid("biomarkers", label, resource=res)
         category = BiomarkerCategory(_BIOMARKERS[gene].value) if gene else BiomarkerCategory.other
