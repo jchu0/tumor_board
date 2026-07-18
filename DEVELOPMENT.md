@@ -16,6 +16,7 @@ backend/            Python — Claude tool_use orchestrator + FastAPI
       schema.py        Enrichment output contract (the template)
       enrich.py        enrichment agent + deterministic grounding verifier
     goc.py          goals-of-care precondition — gates whether guidance runs at all
+    cases.py        patient folder repository: data/cases/ -> /cases endpoints
     stage2/         Stage 2 (adopted split): raw record -> PatientCaseBundle
       bundle.py        contract-shaped models (element_ids, presence, staleness)
       adapter.py       to_bundle(); enums.py, ids.py (deterministic derivations)
@@ -24,9 +25,14 @@ backend/            Python — Claude tool_use orchestrator + FastAPI
     tools/          one module per sub-check, over canned data
     data/           synthetic case (real contract shape) + canned lookup tables
   tests/            operability gate + GOC precondition + ingestion (no API key needed)
-frontend/           Vite + React + TS — findings panel + action ledger + gaps
+frontend/           Vite + React + TS — patient chart browser + findings
   src/
-    App.tsx, api.ts, types.ts, components/
+    App.tsx, api.ts, types.ts
+    components/     PatientList, PatientChart (folder tabs), Markdown,
+                    FindingsPanel, ActionLedger, InferredPanel
+data/
+  cases/            one folder per patient; specialty subfolders of Markdown
+  library/          guidance corpus (guidelines, trials, interactions)
 ```
 
 ## Target architecture: two-stage split (ADOPTED 2026-07-18)
@@ -65,27 +71,32 @@ To add a new data source, write an adapter that returns a `TumorBoardCase` and
 register it in `app/ingest/__init__.py`; nothing downstream changes. Verified
 against all 25 real records in `data/abridge/synthetic-ambient-fhir-25` (0 errors).
 
-## Backend
+## Setup from a clean machine
 
-Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml`
-+ `uv.lock`). Install uv, then:
+Two servers, two terminals. Prerequisites are **Python 3.11+**, **uv**, and
+**Node 20+** — none are assumed present.
+
+```bash
+# one-time, macOS
+brew install node                              # verified with node 26.5.0
+curl -LsSf https://astral.sh/uv/install.sh | sh   # or: brew install uv
+```
+
+### Backend — terminal 1
 
 ```bash
 cd backend
 uv sync --group dev       # create .venv + install locked deps (incl. pytest)
-cp .env.example .env      # add your ANTHROPIC_API_KEY
+cp .env.example .env      # add your ANTHROPIC_API_KEY (only needed for /analyze)
 
 uv run uvicorn app.main:app --reload   # http://localhost:8000
-uv run pytest -q                       # tests run without an API key
+uv run pytest -q                       # 109 tests, no API key required
 ```
 
 Add a dependency with `uv add <pkg>` (or `uv add --group dev <pkg>`); it updates
-`pyproject.toml` and `uv.lock` together.
+`pyproject.toml` and `uv.lock` together. Never hand-edit `uv.lock`.
 
-Endpoints: `GET /case` (bundled synthetic case), `POST /analyze` (empty body →
-runs the orchestrator on the bundled case), `GET /health`.
-
-## Frontend
+### Frontend — terminal 2
 
 ```bash
 cd frontend
@@ -93,7 +104,61 @@ npm install
 npm run dev            # http://localhost:5173, proxies /api → :8000
 ```
 
-Click **Run analysis** to call `POST /api/analyze` and render findings + ledger.
+**If Vite fails to start after a fresh `npm install`:** npm 11 blocks package
+install scripts by default, and Vite needs esbuild's native binary.
+
+```bash
+npm approve-scripts esbuild    # then re-run npm install
+```
+
+The backend must be running for the UI to load — the patient list comes from
+`GET /api/cases`, proxied to `:8000` (see `vite.config.ts`).
+
+### Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | liveness |
+| `GET /cases` | patient list, from `data/cases/` |
+| `GET /cases/{case_id}` | one patient: folders, documents, board transcript |
+| `GET /case` | the bundled synthetic FHIR case (pre-split path) |
+| `POST /enrich` | enrichment agent alone — needs `ANTHROPIC_API_KEY` |
+| `POST /analyze` | orchestrator on the bundled FHIR case — needs `ANTHROPIC_API_KEY` |
+
+`GET /docs` serves FastAPI's interactive browser, useful without the frontend.
+
+## Patient data browser
+
+`data/cases/<case_id>/` holds one patient each, as authored Markdown:
+
+```
+data/cases/hero_breast_escalation/
+  case_meta.json              identity + BENCHMARK GROUND TRUTH
+  tumor_board_transcript.md   the board discussion
+  biometrics/ oncology/ pathology/ radiology/
+  laboratory/ medications/ gynecology/        [<YYYY-MM-DD>_]<slug>.md
+```
+
+`app/cases.py` reads this and serves it; `frontend/src/components/PatientChart.tsx`
+renders a tab per folder. Three rules it enforces:
+
+- **The answer key never leaves.** `case_meta.json` carries `planted_gaps`,
+  `expected_findings_count` and `noise_documents_not_expected_to_fire` — benchmark
+  ground truth. It is stripped in `_read_meta()` before anything is served, so a
+  clinical view can never show "findings" the system did not derive. Asserted by
+  `test_answer_key_never_leaves_the_repository`.
+- **Folders are discovered, not assumed.** Cases differ (`variant_4_lung_control`
+  has `pneumology`; `variant_3_brca_pending` has no `laboratory`). Tab order follows
+  `_FOLDER_ORDER`, and anything unlisted is *appended*, never dropped.
+- **Documents sort standing-first, then newest.** Undated files (`current_med_list.md`,
+  `demographics_and_vitals.md`) are standing records; dated ones follow newest-first.
+
+`data/library/` holds the guidance corpus (guidelines, trials, interactions,
+operability criteria). It is *not* patient data and is not served by these endpoints.
+
+**Not yet wired:** `POST /analyze` still runs on the bundled synthetic FHIR case,
+not on `data/cases/` — the two ingest paths are separate. The UI says so rather
+than implying a connection.
 
 ## Agentic layer (`app/agents/`)
 

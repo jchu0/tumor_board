@@ -15,6 +15,10 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
     "pyyaml>=6.0",
+    # Required by fastapi.testclient (tests/test_cases_api.py). Present
+    # transitively via anthropic, but declared because the tests import it
+    # directly — a transitive dep is not a contract.
+    "httpx>=0.28.1",
 ]
 
 [tool.uv]
