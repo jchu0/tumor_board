@@ -15,11 +15,15 @@ backend/            Python — Claude tool_use orchestrator + FastAPI
     agents/         agentic layer — nuance the deterministic path can't see
       schema.py        Enrichment output contract (the template)
       enrich.py        enrichment agent + deterministic grounding verifier
+    goc.py          goals-of-care precondition — gates whether guidance runs at all
+    stage2/         Stage 2 (adopted split): raw record -> PatientCaseBundle
+      bundle.py        contract-shaped models (element_ids, presence, staleness)
+      adapter.py       to_bundle(); enums.py, ids.py (deterministic derivations)
     schema.py       Finding / ActionItem contracts (signals kept separate)
     config.py       model id + Anthropic client (from .env)
     tools/          one module per sub-check, over canned data
     data/           synthetic case (real contract shape) + canned lookup tables
-  tests/            operability gate + ingestion robustness (no API key needed)
+  tests/            operability gate + GOC precondition + ingestion (no API key needed)
 frontend/           Vite + React + TS — findings panel + action ledger + gaps
   src/
     App.tsx, api.ts, types.ts, components/
@@ -124,6 +128,62 @@ returns a skipped result and `/analyze` errors in the orchestrator call.
 Adding an agent: give it a schema (its output template) in `agents/`, a forced
 structured-output tool, a run function with graceful degradation, and a
 deterministic verifier. Mirror the enrichment agent.
+
+## Preconditions (`app/goc.py`) — checked before options are produced
+
+A **precondition layer** sits in front of option-producing work. There are two, and they share one
+rule: *a permissive outcome requires a positive, checkable result — never merely the absence of a
+contrary one.*
+
+| | Operability gate | GOC precondition |
+|---|---|---|
+| Permissive outcome | present surgery as `cleared` | skip guidance entirely |
+| Requires | a real `cleared` tool result | a valid supportive-care record |
+| On absence | force `not_confirmed` | do **not** skip |
+| Runs | after the model, at emit | **before** the guidance call |
+
+`evaluate_goc()` answers *does this patient want disease-directed care at all?* Two clinical rules
+(clinician-reviewed):
+
+- **Recency is event-relative.** A goals-of-care record written *before* a major treatment event is
+  stale regardless of its date. `goc_date > most_recent_major_event_date AND age_days <= threshold`.
+  Event invalidation is checked first — it is the more actionable answer.
+- **Suppression requires affirmative evidence.** Only `VALID_SUPPORTIVE_ONLY` sets
+  `authorizes_skip = True`. `ABSENT`, `STALE_BY_AGE`, `INVALIDATED_BY_EVENT` and
+  `CONTRADICTED_BY_ROOM` never do. Missing goals of care is the least-informed state, not a licence
+  to withhold options.
+
+- **An undated event is unprovable recency, not absence.** `major_events()` keeps undated events; an
+  undated event of an invalidating kind yields `TIMELINE_INCOMPLETE` (no skip) plus a `data_gap_note`
+  naming them. Dropping them would fail silently in the dangerous direction.
+
+**Inference asymmetry:** a grounded `goals_of_care` inference may *invalidate* a documented record
+(the room is revising it live) but may never *authorize* a skip. Model output triggers conservative
+behaviour only — the same rule that keeps `grounded` out of the enrichment tool schema.
+
+**The skip narrows scope, it does not empty it.** A supportive-care record suppresses
+*disease-directed* guidance only; symptom-directed options (palliative radiotherapy for pain, symptom
+control) stay in scope. `permitted_scope: CareScope` carries the signal and the skip path emits a
+symptom-directed review action item. Deterministic filtering by care intent needs an `intent` field
+on guidance rules — Stage 3, when the pack lands. Branch on `permitted_scope`, not `authorizes_skip`.
+
+**A skip is never silent.** `goc_skip_result()` emits a finding stating the decision and its basis
+plus action items to confirm the record and review symptom-directed options. It carries no
+`recommendation_grade` — no guidance rule matched, so there is nothing to copy one from.
+
+**FHIR date spellings matter.** `fhir_adapter._fhir_date()` reads `performedDateTime` /
+`performedPeriod` / `occurrenceDateTime` (and `onsetDateTime` / `onsetPeriod` / `recordedDate` for
+conditions), collapsing `Period` to its `start`. The 25 real Abridge records use `performedPeriod`
+exclusively — reading only `performedDateTime` left every real procedure undated. After the fix: 515
+events across the 25 records, 0 undated. Add new spellings here rather than at each call site.
+
+Adding a precondition: give it an evaluation function returning a typed result with one explicit
+permissive flag, run it before the work it gates, and make its decision visible in the output.
+
+**Owned by Stage 3, left in `goc.py` deliberately** — do not edit these from Stage 2:
+`MAX_GOC_AGE_DAYS` (threshold varies by clinical scenario), `INVALIDATING_EVENT_KINDS` (which events
+invalidate a record is a clinical call), and care-intent filtering. They move to the guidance pack
+with the Stage 3 owner.
 
 ## Notes
 

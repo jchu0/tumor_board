@@ -43,17 +43,25 @@ transcript file ─────────────────────�
                                                               deterministic triggered checks
                                                               (run_triggered_checks — in code)
                                                                               │
-guidance / canned tables ─────────────────────────────► [3] orchestrator ◄────┘
-                                                          + operability gate
-                                                                │
-                                                   FindingSet + ActionLedger
+                                                          GOC PRECONDITION ◄──┘
+                                                          (evaluate_goc — §8)
+                                                             │           │
+                                              authorizes_skip│           │otherwise
+                                                             ▼           ▼
+                                              disclosed skip      [3] orchestrator ◄── guidance /
+                                              (never silent)      + operability gate     canned tables
+                                                     │                   │
+                                                     └─────────┬─────────┘
+                                                               ▼
+                                                    FindingSet + ActionLedger
 ```
 
 | Stage | What it is | Owner | State |
 |---|---|---|---|
 | **1** | Live STT feed | — | **DESCOPED.** Static transcript file. Deferred, not cancelled. |
-| **2** | Patient data structuring — files/folder → `PatientCaseBundle` | James | not started |
-| **E** | Enrichment pre-pass — source-cited inferences that feed [3] | parallel session | **implemented, 22/22** |
+| **2** | Patient data structuring — files/folder → `PatientCaseBundle` | James | **scaffolded** — `app/stage2/` schema + adapter, 18 contract tests, golden fixture at `fixtures/contract/v1/` |
+| **E** | Enrichment pre-pass — source-cited inferences that feed [3] | parallel session | **implemented** |
+| **P** | Goals-of-care precondition — gates whether guidance runs at all (§8) | — | **implemented, 16 tests** |
 | **3** | Guidance + gap assessment — deterministic join, then bounded model call | Partner | orchestrator exists; guidance-as-input not started |
 
 **Ordering note.** Enrichment is a **pre-pass** — not a parallel channel, and not a consolidator. It
@@ -239,3 +247,138 @@ does not.)
 
 Q1 is the one to resolve first. Stage 3 cannot start without at least a skeleton pack, and its
 clinical content is the part no amount of architecture makes correct.
+
+## 8. The precondition layer — IMPLEMENTED (goals of care)
+
+**Built and tested.** `backend/app/goc.py`, `backend/tests/test_goc.py` (16 tests, suite 38/38).
+Clinical rules reviewed by the clinician partner.
+
+### It is a layer, not a one-off
+
+There are now two preconditions, and they are the same shape:
+
+> **Don't present X as actionable until precondition Y has been checked — and a permissive outcome
+> requires a positive, checkable result, never merely the absence of a contrary one.**
+
+| | Operability gate | GOC precondition |
+|---|---|---|
+| Question | is this physically feasible? | does the patient want this? |
+| Permissive outcome | present surgery as `cleared` | skip guidance entirely |
+| Requires | a real `cleared` tool result | a valid supportive-care record |
+| On absence | force `not_confirmed` | do **not** skip |
+| Runs | after the model, at emit | **before** the guidance call |
+
+Expect a third (drug interaction before a systemic option) and a fourth. When one arrives, add it to
+this layer rather than hand-wiring it — ad-hoc gate #3 is how the original prompt-mediated defect
+happened. **Any new finding source, and any new option-producing path, enters through these
+preconditions.**
+
+### The two clinical rules
+
+**1. Recency is event-relative, not calendar-only.** A goals-of-care conversation recorded *before* a
+major treatment event is stale regardless of its date — the event is precisely what would change the
+answer. Both conditions must hold:
+
+```
+goc_valid = goc_date > most_recent_major_event_date  AND  age_days <= threshold
+```
+
+Event invalidation is evaluated *before* calendar age because it is the more specific and more
+actionable answer: "recorded before the lobectomy" tells a clinician something "180 days old" does
+not.
+
+**2. Suppression requires affirmative evidence.** Guidance may be skipped only on a positive, recent,
+event-valid record documenting supportive care. `ABSENT`, `STALE_BY_AGE`, `INVALIDATED_BY_EVENT`, and
+`CONTRADICTED_BY_ROOM` all yield `authorizes_skip = False`. Missing goals of care is the *least*
+informed state, not a licence to withhold options — and silent withholding is invisible harm, since
+nobody can audit what was never shown.
+
+`GocStatus` has seven values; exactly one sets `authorizes_skip = True`.
+
+**3. An undated event is unprovable recency, not absence.** `major_events()` retains events that carry
+no usable date, and an undated event of an invalidating kind yields `TIMELINE_INCOMPLETE` — no skip,
+plus a `data_gap_note` naming the events so a provider can see *why* the record could not be
+confirmed. Dropping them would be a silent failure in the dangerous direction: an undated surgery
+that in fact postdates the record would vanish, and the record would look valid.
+
+This was not hypothetical. `fhir_adapter.py` read only `performedDateTime`, which **does not occur
+anywhere in the 25 real Abridge records** — they use `performedPeriod` (515 occurrences). Every real
+procedure arrived undated. `_fhir_date()` now reads across FHIR spellings (`performedDateTime`,
+`performedPeriod`, `occurrenceDateTime`; `onsetDateTime`, `onsetPeriod`, `recordedDate` for
+conditions) and collapses `Period` to its `start`. Measured after the fix: **515 events across the 25
+records, 0 undated.** The `TIMELINE_INCOMPLETE` path remains for sources that genuinely lack dates —
+capture what dates exist, surface the rest to the provider.
+
+### The inference asymmetry
+
+A grounded `InferenceKind.goals_of_care` observation from the room:
+
+- **may invalidate** a documented record → `CONTRADICTED_BY_ROOM`. If goals of care are being
+  discussed *now*, the chart is under live revision and cannot be relied on to skip.
+- **may never authorize** a skip. A model-inferred "she wants supportive care" does not suppress
+  guidance on its own.
+
+This is the general rule this system runs on, applied again: **model output triggers conservative
+behaviour, never permissive behaviour.** Same reason `grounded` is absent from the enrichment tool
+schema and `cleared` requires a real tool result. Only a *verified* quote counts as a room signal.
+
+### The skip narrows scope; it does not empty it
+
+A supportive-care record suppresses **disease-directed** guidance only. Symptom-directed options —
+palliative radiotherapy for pain, symptom control — remain clinically appropriate and are not
+withheld. `GocEvaluation.permitted_scope` carries this as a `CareScope`
+(`all_options` | `symptom_directed_only`), and `goc_skip_result()` emits a second action item
+directing symptom-directed review.
+
+**Stage 3 completes this.** Deterministic filtering by care intent needs guidance rules to carry an
+`intent` field; until the pack exists, the precondition emits the scope signal and the skip path
+states plainly that symptom-directed options were not covered by the run. Branch on
+`permitted_scope`, not on `authorizes_skip`, when the pack lands.
+
+### A skip is never silent
+
+When guidance is skipped, `goc_skip_result()` emits a finding stating the decision and its basis —
+the record's date, its age, and the absence of an intervening event — plus action items to confirm
+the record and to review symptom-directed options. Skip the guidance; never skip the disclosure.
+
+The finding carries **no `recommendation_grade`**: no guidance rule matched, so there is nothing to
+copy a grade from. Same rule as enrichment (§5).
+
+A clinically credible system is one that declines to recommend and says exactly why — not one that
+always produces options.
+
+### Two Stage 2 requirements this creates
+
+Both belong in the golden fixture **before** either owner starts:
+
+1. **A dated event timeline, not a flattened snapshot.** Event-relative recency is impossible if the
+   bundle only carries current state. `major_events()` derives events mechanically from
+   `diagnosis_date` and `prior_treatments` (including a recorded progression in `response`), keeping
+   undated ones. `PatientCaseBundle` must preserve dates *and* types — and must read every FHIR date
+   spelling the source uses, per the `performedPeriod` finding above. Where a date genuinely does not
+   exist, carry the event with a null date rather than dropping it, so the gap is reportable.
+2. **GOC scope, not just a date.** The README also asks for *scope mismatch* — a conversation about
+   chemotherapy does not cover a surgical question. Today `GoalsOfCare` carries
+   `documented_date | summary | status`, so only staleness is checkable. Scope-matching needs the
+   record to carry what it covered.
+
+### Handoff to Stage 3 — code changes to be made on the Stage 3 side
+
+Three pieces of clinical opinion currently sit in `goc.py`, on the wrong side of the seam. They are
+marked as such in the source and are **deliberately left in place**: the corresponding code edits
+belong to the Stage 3 owner, together with the guidance pack, and should not be made from Stage 2.
+
+| Item | Today | Belongs in |
+|---|---|---|
+| `MAX_GOC_AGE_DAYS = 180` | module constant in `goc.py` | a guidance rule (threshold varies by scenario — six months for stable disease, days for a fast-moving one) |
+| `INVALIDATING_EVENT_KINDS` | module set in `goc.py` | the guidance pack — which event kinds invalidate a prior record is a clinical call, and the clinician partner should enumerate it |
+| Care-intent filtering | `permitted_scope` signal only | guidance rules need an `intent` field so symptom-directed options can be filtered deterministically |
+
+Stage 2 keeps what is mechanical: emitting dated events and their kinds.
+
+### Still open
+
+- **GOC scope matching** is unimplemented pending the schema change above (requirement 2).
+- The **research agent** (§7 discussion) sits downstream of this precondition: its auto-trigger on
+  empty guidance must not fire when `authorizes_skip` is true, and its fallback condition must key on
+  *disease-specific* rules, since `GEN-*` completeness rules match nearly every case.
