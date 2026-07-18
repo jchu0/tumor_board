@@ -61,7 +61,7 @@ export default function App() {
               Analysis
             </button>
           </div>
-          <button onClick={analyze} disabled={loading}>
+          <button className="run" onClick={analyze} disabled={loading}>
             {loading ? "Analyzing…" : "Run analysis"}
           </button>
         </div>
