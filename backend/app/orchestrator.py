@@ -93,21 +93,27 @@ def gate_operability(
     return findings
 
 
+_SKIP_ISSUE = "Disease-directed guidance and trial matching were not surfaced for this case."
+
+
 def goc_skip_result(goc: GocEvaluation, enrichment: Enrichment | None) -> AnalysisResult:
-    """The skip path. Guidance is skipped, but the SKIP ITSELF IS SURFACED — a
-    system that declines to recommend must say so, or the clinician cannot tell
-    the difference between 'nothing applies' and 'nothing was looked for'."""
+    """The narrowed-scope path. DISEASE-DIRECTED guidance is skipped; symptom-directed
+    care is not — a supportive-care record narrows the scope, it does not empty it.
+
+    The skip ITSELF IS SURFACED: a system that declines to recommend must say so, or
+    the clinician cannot tell 'nothing applies' from 'nothing was looked for'."""
     return AnalysisResult(
         findings=[
             Finding(
-                issue="Disease-directed guidance and trial matching were not surfaced for this case.",
+                issue=_SKIP_ISSUE,
                 evidence_ref=f"goals_of_care@{goc.documented_date}",
                 recommendation=goc.disclosure,
                 recommendation_grade=None,  # no guidance rule matched — nothing to copy a grade from
                 match_confidence=1.0,       # a deterministic record check, not a semantic match
                 patient_facing_note=(
                     "Care is being guided by the goals this patient already documented, which focus on "
-                    "comfort and support rather than further disease-directed treatment."
+                    "comfort and support rather than further disease-directed treatment. Treatments that "
+                    "relieve symptoms remain available."
                 ),
                 live_question=(
                     "Do the documented goals of care still reflect what this patient wants today?"
@@ -120,8 +126,16 @@ def goc_skip_result(goc: GocEvaluation, enrichment: Enrichment | None) -> Analys
             ActionItem(
                 action="Confirm the documented goals of care still reflect the patient's wishes.",
                 owner="NURSE_COORDINATOR",
-                linked_finding="Disease-directed guidance and trial matching were not surfaced for this case.",
-            )
+                linked_finding=_SKIP_ISSUE,
+            ),
+            ActionItem(
+                action=(
+                    "Review symptom-directed options (e.g. palliative radiotherapy, symptom control) — "
+                    "in scope despite the supportive-care goals, and not covered by this run."
+                ),
+                owner="ONCOLOGIST",
+                linked_finding=_SKIP_ISSUE,
+            ),
         ],
         enrichment=enrichment or Enrichment(),
         goc=goc,

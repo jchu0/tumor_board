@@ -92,6 +92,7 @@ class GocEvaluation(BaseModel):
     branches on, and it is True in exactly one status."""
     status: GocStatus
     authorizes_skip: bool = False
+    permitted_scope: CareScope = CareScope.all_options
     documented_date: Optional[str] = None
     age_days: Optional[int] = None
     reference_date: Optional[str] = Field(None, description="Date the age was measured against (board date).")
@@ -100,6 +101,11 @@ class GocEvaluation(BaseModel):
     summary: Optional[str] = None
     disclosure: str = Field(..., description="Human-readable statement of the decision. Always shown — a skip is never silent.")
     revisit_recommended: bool = False
+    # Data-quality surface. Undated events are REPORTED, never dropped: an event we
+    # cannot place in time is exactly the one that might invalidate this record.
+    undated_events: list[MajorEvent] = Field(default_factory=list)
+    timeline_complete: bool = True
+    data_gap_note: Optional[str] = Field(None, description="Shown to providers when the timeline is partial.")
 
 
 def _parse_date(s: Optional[str]) -> Optional[date]:
@@ -116,19 +122,24 @@ def _parse_date(s: Optional[str]) -> Optional[date]:
 
 
 def major_events(case: TumorBoardCase) -> list[MajorEvent]:
-    """Mechanical: every dated clinical event that could change a care decision.
-    No judgement about which ones matter — that is INVALIDATING_EVENT_KINDS' job."""
+    """Mechanical: every clinical event that could change a care decision, DATED OR
+    NOT. No judgement about which ones matter — that is INVALIDATING_EVENT_KINDS'
+    job.
+
+    Undated events are deliberately retained. Dropping them would be a silent
+    failure in the dangerous direction: an undated surgery that in fact postdates a
+    goals-of-care record would vanish, and the record would look valid. Callers
+    treat an undated invalidating event as *unprovable recency*, not as absence."""
     events: list[MajorEvent] = []
-    if case.diagnosis and case.diagnosis.diagnosis_date:
+    if case.diagnosis and (case.diagnosis.diagnosis_date or case.diagnosis.primary_site):
         events.append(MajorEvent(kind="diagnosis", name=case.diagnosis.primary_site, date=case.diagnosis.diagnosis_date))
     for t in case.prior_treatments:
-        if t.date:
-            kind = (t.kind or "procedure").lower()
-            events.append(MajorEvent(kind=kind, name=t.name, date=t.date))
-            # A recorded progression is itself an inflection point.
-            if t.response and re.search(r"progress\w*|relapse\w*|recurr\w*", t.response, re.I):
-                events.append(MajorEvent(kind="progression", name=f"{t.name}: {t.response}", date=t.date))
-    return [e for e in events if _parse_date(e.date)]
+        kind = (t.kind or "procedure").lower()
+        events.append(MajorEvent(kind=kind, name=t.name, date=t.date))
+        # A recorded progression is itself an inflection point.
+        if t.response and re.search(r"progress\w*|relapse\w*|recurr\w*", t.response, re.I):
+            events.append(MajorEvent(kind="progression", name=f"{t.name}: {t.response}", date=t.date))
+    return events
 
 
 def _reference_date(case: TumorBoardCase, events: list[MajorEvent]) -> Optional[date]:
@@ -177,6 +188,17 @@ def evaluate_goc(
     goc_date = _parse_date(goc.documented_date) if goc else None
     summary = " ".join(filter(None, [(goc.summary if goc else None), (goc.status if goc else None)]))
 
+    # Undated events of an invalidating kind make recency UNPROVABLE. Surface them
+    # to the provider rather than silently treating them as absent.
+    undated = [e for e in events if not e.dated and e.kind in INVALIDATING_EVENT_KINDS]
+    gap_note = None
+    if undated:
+        names = ", ".join(f"{e.kind}: {e.name}" for e in undated[:4])
+        gap_note = (
+            f"{len(undated)} clinical event(s) carry no usable date in the source record ({names}). "
+            "Whether the documented goals of care predate them cannot be established from the data."
+        )
+
     # --- absent -------------------------------------------------------------
     if not goc or not (goc.summary or goc.status):
         return GocEvaluation(
@@ -184,6 +206,7 @@ def evaluate_goc(
             authorizes_skip=False,
             reference_date=ref.isoformat() if ref else None,
             revisit_recommended=True,
+            undated_events=undated, timeline_complete=not undated, data_gap_note=gap_note,
             disclosure=(
                 "No goals-of-care conversation is documented. Guidance was NOT skipped — "
                 "absent goals of care is the least-informed state, not a reason to withhold options."
@@ -201,6 +224,7 @@ def evaluate_goc(
             documented_date=goc.documented_date, age_days=age_days,
             reference_date=ref.isoformat() if ref else None,
             room_signal_quote=quote, summary=summary, revisit_recommended=True,
+            undated_events=undated, timeline_complete=not undated, data_gap_note=gap_note,
             disclosure=(
                 "Goals of care are being discussed in this meeting, so the documented record is "
                 f"under live revision and was not relied on. Room signal: \"{quote}\""
@@ -222,6 +246,7 @@ def evaluate_goc(
             documented_date=goc.documented_date, age_days=age_days,
             reference_date=ref.isoformat() if ref else None,
             invalidating_event=invalidating, summary=summary, revisit_recommended=True,
+            undated_events=undated, timeline_complete=not undated, data_gap_note=gap_note,
             disclosure=(
                 f"Documented goals of care ({goc.documented_date}) predate a major treatment event "
                 f"({invalidating.kind}: {invalidating.name}, {invalidating.date}) and were not relied on. "
@@ -237,10 +262,29 @@ def evaluate_goc(
             documented_date=goc.documented_date, age_days=age_days,
             reference_date=ref.isoformat() if ref else None,
             summary=summary, revisit_recommended=True,
+            undated_events=undated, timeline_complete=not undated, data_gap_note=gap_note,
             disclosure=(
                 f"Documented goals of care are undated or older than {max_age_days} days"
                 + (f" ({age_days} days)" if age_days is not None else "")
                 + " and were not relied on. Goals of care should be revisited."
+            ),
+        )
+
+    # --- unprovable recency: undated events of an invalidating kind ----------
+    # Reached only when the record is otherwise valid. We cannot show it postdates
+    # these events, so it cannot authorize a skip — but the reason is a DATA GAP,
+    # reported as such, not a clinical judgment about this patient.
+    if undated:
+        return GocEvaluation(
+            status=GocStatus.TIMELINE_INCOMPLETE,
+            authorizes_skip=False,
+            documented_date=goc.documented_date, age_days=age_days,
+            reference_date=ref.isoformat() if ref else None,
+            summary=summary, revisit_recommended=True,
+            undated_events=undated, timeline_complete=False, data_gap_note=gap_note,
+            disclosure=(
+                f"Documented goals of care ({goc.documented_date}) could not be confirmed as current: "
+                f"{gap_note} Guidance was not skipped. Confirm the source record's event dates."
             ),
         )
 
@@ -249,13 +293,16 @@ def evaluate_goc(
         return GocEvaluation(
             status=GocStatus.VALID_SUPPORTIVE_ONLY,
             authorizes_skip=True,
+            permitted_scope=CareScope.symptom_directed_only,
             documented_date=goc.documented_date, age_days=age_days,
             reference_date=ref.isoformat() if ref else None,
-            summary=summary,
+            summary=summary, timeline_complete=True,
             disclosure=(
-                f"Guidance and trial matching were NOT surfaced. Goals of care documented "
-                f"{goc.documented_date} ({age_days} days ago, with no major treatment event since) "
-                f"record supportive care only: \"{summary.strip()}\""
+                f"Disease-directed guidance and trial matching were NOT surfaced. Goals of care "
+                f"documented {goc.documented_date} ({age_days} days ago, with no major treatment event "
+                f"since) record supportive care only: \"{summary.strip()}\" "
+                "Symptom-directed options (for example palliative radiotherapy for pain) remain in "
+                "scope and are unaffected by this."
             ),
         )
 

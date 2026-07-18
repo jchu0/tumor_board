@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from app.agents.schema import Enrichment, InferenceKind, InferredObservation, SourceRef
 from app.case_schema import Diagnosis, GoalsOfCare, PriorTreatment, TumorBoardCase
-from app.goc import GocStatus, evaluate_goc, major_events
+from app.goc import CareScope, GocStatus, evaluate_goc, major_events
 
 
 def _case(goc: GoalsOfCare | None = None, treatments: list[PriorTreatment] | None = None,
@@ -88,14 +88,18 @@ def test_progression_response_is_itself_an_invalidating_event():
     assert ev.authorizes_skip is False
 
 
-def test_major_events_are_mechanical_and_dated():
+def test_major_events_are_mechanical_and_keep_undated_entries():
+    """Events are derived mechanically, and undated ones are KEPT — see
+    test_undated_invalidating_event_blocks_skip_and_is_reported for why."""
     case = _case(treatments=[
         PriorTreatment(name="lobectomy", kind="surgery", date="2026-06-20"),
         PriorTreatment(name="undated", kind="systemic", date=None),
     ])
-    kinds = {e.kind for e in major_events(case)}
+    events = major_events(case)
+    kinds = {e.kind for e in events}
     assert "surgery" in kinds and "diagnosis" in kinds
-    assert all(e.date for e in major_events(case))  # undated events are dropped
+    assert {e.name for e in events} >= {"lobectomy", "undated"}
+    assert [e.dated for e in events].count(False) == 1
 
 
 # --- rule 2: suppression requires AFFIRMATIVE evidence -----------------------
@@ -184,3 +188,68 @@ def test_skip_result_surfaces_the_skip_and_carries_no_grade():
     assert result.findings[0].source_agent == "goals_of_care_precondition"
     assert result.goc.status is GocStatus.VALID_SUPPORTIVE_ONLY
     assert result.action_ledger  # confirming the record stays a human to-do
+
+
+# --- the skip narrows scope, it does not empty it ----------------------------
+
+def test_supportive_only_narrows_scope_to_symptom_directed():
+    case = _case(GoalsOfCare(documented_date="2026-06-02", summary="Comfort-focused care only."))
+    ev = evaluate_goc(case)
+    assert ev.permitted_scope is CareScope.symptom_directed_only
+    assert "symptom-directed" in ev.disclosure.lower()
+
+
+def test_non_skip_paths_keep_full_scope():
+    for goc in (None, GoalsOfCare(documented_date="2026-06-02", summary="Pursue all treatment options.")):
+        assert evaluate_goc(_case(goc)).permitted_scope is CareScope.all_options
+
+
+def test_skip_result_still_flags_symptom_directed_review():
+    from app.orchestrator import goc_skip_result
+    case = _case(GoalsOfCare(documented_date="2026-06-02", summary="Comfort-focused care only."))
+    result = goc_skip_result(evaluate_goc(case), None)
+    assert any("symptom-directed" in a.action.lower() for a in result.action_ledger)
+
+
+# --- undated events are surfaced, never silently dropped ---------------------
+
+def test_undated_invalidating_event_blocks_skip_and_is_reported():
+    """The dangerous case: an undated surgery might postdate the GOC record. We
+    cannot prove recency, so we must not skip — and must say why."""
+    case = _case(
+        GoalsOfCare(documented_date="2026-06-02", summary="Comfort-focused care only."),
+        treatments=[PriorTreatment(name="lobectomy", kind="surgery", date=None)],
+    )
+    ev = evaluate_goc(case)
+    assert ev.status is GocStatus.TIMELINE_INCOMPLETE
+    assert ev.authorizes_skip is False
+    assert ev.timeline_complete is False
+    assert ev.undated_events and ev.undated_events[0].name == "lobectomy"
+    assert "lobectomy" in ev.data_gap_note
+
+
+def test_undated_events_are_retained_by_major_events():
+    """Regression: dropping undated events hid exactly the ones that matter."""
+    case = _case(treatments=[PriorTreatment(name="undated surgery", kind="surgery", date=None)])
+    names = {e.name for e in major_events(case)}
+    assert "undated surgery" in names
+    assert any(not e.dated for e in major_events(case))
+
+
+def test_dated_events_still_report_a_complete_timeline():
+    case = _case(
+        GoalsOfCare(documented_date="2026-07-01", summary="Comfort-focused care only."),
+        treatments=[PriorTreatment(name="lobectomy", kind="surgery", date="2026-06-20")],
+    )
+    ev = evaluate_goc(case)
+    assert ev.timeline_complete is True
+    assert ev.data_gap_note is None
+    assert ev.authorizes_skip is True
+
+
+def test_data_gap_is_surfaced_even_when_goc_is_absent():
+    """A provider should learn the timeline is partial regardless of GOC state."""
+    case = _case(None, treatments=[PriorTreatment(name="lobectomy", kind="surgery", date=None)])
+    ev = evaluate_goc(case)
+    assert ev.status is GocStatus.ABSENT
+    assert ev.timeline_complete is False and ev.data_gap_note
