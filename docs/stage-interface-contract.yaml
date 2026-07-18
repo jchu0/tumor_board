@@ -1,5 +1,6 @@
 contract_version: 1.0.0
-status: PROPOSED
+status: ACCEPTED  # two-person Stage 2 / Stage 3 split adopted 2026-07-18
+accepted_on: 2026-07-18
 generated_at: 2026-07-18
 producer: production-agent-architecture-advisor
 project: tumor-board-gap-detection-assistant

@@ -25,7 +25,25 @@ frontend/           Vite + React + TS — findings panel + action ledger + gaps
     App.tsx, api.ts, types.ts, components/
 ```
 
-## Data model (two layers)
+## Target architecture: two-stage split (ADOPTED 2026-07-18)
+
+The go-forward design is a two-person split with a typed seam. Governing docs:
+`docs/architecture-delta.md` (narrative) and `docs/stage-interface-contract.yaml`
+(authoritative, `status: ACCEPTED`).
+
+- **Stage 2 — patient data structuring + transcript (James):** raw record → `PatientCaseBundle`
+  (normalized facts with stable `element_id`s + mechanical `presence`/`staleness`). No clinical
+  judgment; "gap" must not appear in its output.
+- **Stage 3 — guidance + gap assessment (partner):** `PatientCaseBundle` + `GuidancePack` +
+  `TranscriptBundle` → `FindingSet` + `ActionLedger`. Guideline coverage is a deterministic join,
+  grades are copied from guidance rules, provenance is a structured `evidence[]` ledger.
+
+Build in parallel against a committed golden fixture (`fixtures/contract/v1/`); neither owner edits a
+fixture unilaterally (a fixture change is a contract change). The current `backend/` below is the
+pre-split monolith being migrated toward this shape — notably `completeness()` is slated for retirement
+in favor of `presence` + guidance rules.
+
+## Data model (current, pre-split — two layers)
 
 Incoming data lands as the flexible **FHIR envelope** (Abridge's real contract:
 `patient_context`, `encounter_fhir.related_resources` grouped by FHIR type,

@@ -8,9 +8,15 @@
 > *are* captured (`orchestrator.py:178`); the original claim was verified stale against
 > current code. Marked inline.
 
+**Decision (2026-07-18): ADOPTED.** The two-person Stage 2 / Stage 3 split described here is the
+agreed go-forward architecture. `docs/stage-interface-contract.yaml` is `status: ACCEPTED` and is the
+authoritative seam. Ownership: **Stage 2 (patient data structuring + transcript) — James; Stage 3
+(guidance + gap assessment) — partner.** The current `backend/` is the pre-split monolith and is
+being migrated toward this shape; sections below mark what exists vs. what is still to build.
+
 **Status:** partially implemented. `README.md` remains the historical spec; this file is the delta
 against it. The enrichment pass (§5) is **built and tested** — 22/22 passing. The Stage 2 / Stage 3
-seam (§3) is **not yet implemented**. Each section marks its own state.
+seam (§3) is **adopted but not yet implemented**. Each section marks its own state.
 
 **Audience:** the two component owners. Read this before writing code against the other person's half.
 
