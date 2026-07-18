@@ -85,6 +85,7 @@ class AnalysisResult(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
-    """A full source record (FHIR-envelope shape). If omitted, the API falls
-    back to the bundled synthetic case."""
+    """Selects what to analyze, in precedence order: a data/cases case_id, then a
+    full FHIR-envelope record, else the bundled synthetic case."""
+    case_id: Optional[str] = Field(None, description="A folder under data/cases/ to structure and analyze.")
     record: Optional[dict] = None

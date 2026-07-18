@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import re
 
-_LABEL = re.compile(r"^\s*([A-Z][A-Z0-9_ ]{1,30}):\s*(.*)$")
+# Optional leading turn number ("1. ") — the data/cases board transcripts number
+# their turns; the Abridge-style "SPEAKER: text" form has no number.
+_LABEL = re.compile(r"^\s*(?:\d+\.\s*)?([A-Z][A-Z0-9_ ]{1,30}):\s*(.*)$")
 
 
 def parse(transcript: str | list) -> list[dict]:

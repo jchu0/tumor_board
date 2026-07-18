@@ -17,6 +17,7 @@ from .ingest import ingest
 from .ingest.transcript import parse as parse_transcript
 from .orchestrator import analyze
 from .schema import AnalysisResult, AnalyzeRequest
+from .stage2.extract import analysis_inputs_from_case
 from .tools._data import load
 
 
@@ -46,6 +47,18 @@ def _record(req: AnalyzeRequest | None = None) -> dict:
     return load(DEFAULT_CASE)
 
 
+def _inputs(req: AnalyzeRequest | None = None) -> tuple[dict, dict]:
+    """(fhir_record, free_text) for the pipeline. A case_id structures a
+    data/cases folder; otherwise fall back to a record or the bundled case."""
+    if req and req.case_id:
+        try:
+            return analysis_inputs_from_case(req.case_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown case: {req.case_id}")
+    record = _record(req)
+    return record, _free_text(record)
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -68,20 +81,20 @@ def sample_case() -> dict:
 @app.post("/enrich", response_model=Enrichment)
 def run_enrichment(req: AnalyzeRequest) -> Enrichment:
     """Run only the enrichment agent — for isolated testing of inferred output."""
-    record = _record(req)
+    record, free_text = _inputs(req)
     case = ingest(record)
     transcript = parse_transcript(record.get("transcript", []))
-    return enrich(case, transcript, _free_text(record))
+    return enrich(case, transcript, free_text)
 
 
 @app.post("/analyze", response_model=AnalysisResult)
 def run_analysis(req: AnalyzeRequest) -> AnalysisResult:
-    record = _record(req)
+    record, free_text = _inputs(req)
     case = ingest(record)
     transcript = parse_transcript(record.get("transcript", []))
     # Enrichment runs first so its source-cited leads feed the orchestrator;
     # it degrades to empty if there's no API key, so analysis still runs.
-    enrichment = enrich(case, transcript, _free_text(record))
+    enrichment = enrich(case, transcript, free_text)
     return analyze(case, transcript, enrichment)
 
 
