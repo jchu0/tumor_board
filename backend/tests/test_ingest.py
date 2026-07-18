@@ -31,7 +31,8 @@ def test_partial_data_still_fits_and_flags_gaps():
     missing = {m.field for m in case.completeness()}
     assert "biomarkers" in missing
     assert "performance_status" in missing
-    assert "goals_of_care" in missing
+    # goals_of_care is intentionally NOT flagged here — owned by the GOC precondition.
+    assert "goals_of_care" not in missing
 
 
 def test_unknown_resource_type_is_preserved_not_dropped():

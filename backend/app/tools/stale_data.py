@@ -1,8 +1,9 @@
-"""flag_stale_data — surface missing or aging chart data, incl. goals-of-care staleness.
+"""flag_stale_data — surface missing or aging chart data.
 
-Goals-of-care is first-class: if the plan trends aggressive and the documented GOC
-conversation is old or doesn't cover this scenario, emit a 'revisit goals of care'
-signal (README §1a Tier 1.5).
+Goals-of-care staleness is NOT handled here. It is owned by the goals-of-care
+precondition (app/goc.py), which evaluates it deterministically before guidance
+rather than as a tool the model may or may not call. This tool covers general
+chart-field staleness only.
 """
 from __future__ import annotations
 
@@ -12,8 +13,7 @@ SCHEMA = {
     "name": "flag_stale_data",
     "description": (
         "Given chart fields with 'last updated' dates, flag anything missing or older than "
-        "a freshness threshold. Pass goals_of_care_date and whether the emerging plan is "
-        "aggressive to check goals-of-care staleness/mismatch."
+        "a freshness threshold."
     ),
     "input_schema": {
         "type": "object",
@@ -31,8 +31,6 @@ SCHEMA = {
             },
             "as_of": {"type": "string", "description": "ISO date to measure against (the board date)."},
             "stale_after_days": {"type": "integer", "default": 180},
-            "goals_of_care_date": {"type": "string"},
-            "plan_is_aggressive": {"type": "boolean", "default": False},
         },
         "required": ["fields", "as_of"],
     },
@@ -48,7 +46,7 @@ def _age_days(iso: str | None, as_of: date) -> int | None:
         return None
 
 
-def run(fields, as_of, stale_after_days=180, goals_of_care_date=None, plan_is_aggressive=False):
+def run(fields, as_of, stale_after_days=180):
     as_of_d = date.fromisoformat(as_of)
     flags = []
     for f in fields:
@@ -57,13 +55,4 @@ def run(fields, as_of, stale_after_days=180, goals_of_care_date=None, plan_is_ag
             flags.append({"field": f["name"], "reason": "missing or undated"})
         elif age > stale_after_days:
             flags.append({"field": f["name"], "reason": f"last updated {age} days ago"})
-
-    goc_age = _age_days(goals_of_care_date, as_of_d)
-    if plan_is_aggressive and (goc_age is None or goc_age > stale_after_days):
-        flags.append(
-            {
-                "field": "goals_of_care",
-                "reason": "plan trends aggressive but goals-of-care is missing/stale — consider revisiting with the patient",
-            }
-        )
     return {"stale_or_missing": flags}

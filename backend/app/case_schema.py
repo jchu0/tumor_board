@@ -169,8 +169,8 @@ class TumorBoardCase(BaseModel):
             missing.append(MissingField(field="biomarkers", reason="no molecular/biomarker results present"))
         if not (self.performance_status and self.performance_status.value):
             missing.append(MissingField(field="performance_status", reason="no ECOG/Karnofsky recorded"))
-        if not (self.goals_of_care and self.goals_of_care.summary):
-            missing.append(MissingField(field="goals_of_care", reason="no goals-of-care documented"))
+        # goals_of_care absence is NOT flagged here — it is owned by the goals-of-care
+        # precondition (app/goc.py, GocStatus.ABSENT), which handles it authoritatively.
         if not any(m.intent == MedIntent.current for m in self.medications):
             missing.append(MissingField(field="medications.current", reason="no current medications listed"))
         return missing
