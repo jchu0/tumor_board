@@ -7,8 +7,11 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import HTTPException
+
 from .agents.enrich import enrich
 from .agents.schema import Enrichment
+from .cases import CaseDetail, CaseSummary, get_case, list_cases
 from .config import FRONTEND_ORIGIN
 from .ingest import ingest
 from .ingest.transcript import parse as parse_transcript
@@ -80,3 +83,20 @@ def run_analysis(req: AnalyzeRequest) -> AnalysisResult:
     # it degrades to empty if there's no API key, so analysis still runs.
     enrichment = enrich(case, transcript, _free_text(record))
     return analyze(case, transcript, enrichment)
+
+
+@app.get("/cases", response_model=list[CaseSummary])
+def all_cases() -> list[CaseSummary]:
+    """Patient list. Identity only — the benchmark ground truth in case_meta.json
+    (planted_gaps and friends) is stripped in the repository, never served."""
+    return list_cases()
+
+
+@app.get("/cases/{case_id}", response_model=CaseDetail)
+def one_case(case_id: str) -> CaseDetail:
+    """One patient's folders and documents, plus the board transcript. Folders are
+    whatever exists on disk — cases carry different specialties."""
+    case = get_case(case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail=f"unknown case: {case_id}")
+    return case
