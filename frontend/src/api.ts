@@ -1,4 +1,4 @@
-import type { AnalysisResult, CaseResponse } from "./types";
+import type { AnalysisResult, CaseDetail, CaseResponse, CaseSummary } from "./types";
 
 // Vite proxies /api -> http://localhost:8000 (see vite.config.ts).
 const BASE = "/api";
@@ -16,5 +16,17 @@ export async function runAnalysis(): Promise<AnalysisResult> {
     body: JSON.stringify({}), // empty body → backend uses the bundled synthetic case
   });
   if (!res.ok) throw new Error(`POST /analyze failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCases(): Promise<CaseSummary[]> {
+  const res = await fetch(`${BASE}/cases`);
+  if (!res.ok) throw new Error(`GET /cases failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCaseDetail(caseId: string): Promise<CaseDetail> {
+  const res = await fetch(`${BASE}/cases/${encodeURIComponent(caseId)}`);
+  if (!res.ok) throw new Error(`GET /cases/${caseId} failed: ${res.status}`);
   return res.json();
 }

@@ -1,31 +1,46 @@
 import { useEffect, useState } from "react";
-import { fetchCase, runAnalysis } from "./api";
+import { fetchCaseDetail, fetchCases, runAnalysis } from "./api";
+import { PatientList } from "./components/PatientList";
+import { PatientChart } from "./components/PatientChart";
 import { FindingsPanel } from "./components/FindingsPanel";
 import { ActionLedger } from "./components/ActionLedger";
 import { InferredPanel } from "./components/InferredPanel";
-import type { AnalysisResult, MissingField, TranscriptLine } from "./types";
+import type { AnalysisResult, CaseDetail, CaseSummary } from "./types";
+
+type View = "chart" | "analysis";
 
 export default function App() {
-  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
-  const [gaps, setGaps] = useState<MissingField[]>([]);
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [detail, setDetail] = useState<CaseDetail | null>(null);
+  const [view, setView] = useState<View>("chart");
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchCase()
-      .then((c) => {
-        setTranscript(c.transcript);
-        setGaps(c.completeness);
+    fetchCases()
+      .then((cs) => {
+        setCases(cs);
+        if (cs.length) setSelected(cs[0].case_id);
       })
       .catch((e) => setError(String(e)));
   }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    setDetail(null);
+    fetchCaseDetail(selected)
+      .then(setDetail)
+      .catch((e) => setError(String(e)));
+  }, [selected]);
 
   async function analyze() {
     setLoading(true);
     setError(null);
     try {
       setResult(await runAnalysis());
+      setView("analysis");
     } catch (e) {
       setError(String(e));
     } finally {
@@ -37,44 +52,56 @@ export default function App() {
     <div className="app">
       <header className="app__head">
         <h1>Tumor Board — Gap Detection</h1>
-        <button onClick={analyze} disabled={loading}>
-          {loading ? "Analyzing…" : "Run analysis"}
-        </button>
+        <div className="app__actions">
+          <div className="viewswitch">
+            <button className={view === "chart" ? "on" : ""} onClick={() => setView("chart")}>
+              Patient chart
+            </button>
+            <button className={view === "analysis" ? "on" : ""} onClick={() => setView("analysis")}>
+              Analysis
+            </button>
+          </div>
+          <button onClick={analyze} disabled={loading}>
+            {loading ? "Analyzing…" : "Run analysis"}
+          </button>
+        </div>
       </header>
 
       {error && <div className="error">{error}</div>}
 
       <div className="layout">
-        <section className="panel transcript">
-          <h2>Transcript</h2>
-          {transcript.map((l) => (
-            <p key={l.line} className="tline">
-              <span className="tline__meta">
-                {l.timestamp} · {l.speaker}
-              </span>
-              {l.text}
-            </p>
-          ))}
-        </section>
+        <PatientList cases={cases} selected={selected} onSelect={setSelected} />
 
-        <div className="findings-col">
-          {gaps.length > 0 && (
-            <section className="panel">
-              <h2>Structural gaps ({gaps.length})</h2>
-              <p className="empty">Oncology essentials absent from the structured case:</p>
-              <ul className="gaps">
-                {gaps.map((g) => (
-                  <li key={g.field}>
-                    <code>{g.field}</code> — {g.reason}
-                  </li>
-                ))}
-              </ul>
+        {view === "chart" ? (
+          detail ? (
+            <PatientChart detail={detail} />
+          ) : (
+            <section className="chart">
+              <p className="empty">{selected ? "Loading chart…" : "Select a patient."}</p>
             </section>
-          )}
-          <FindingsPanel findings={result?.findings ?? []} />
-          {result?.enrichment && <InferredPanel enrichment={result.enrichment} />}
-          <ActionLedger items={result?.action_ledger ?? []} />
-        </div>
+          )
+        ) : (
+          <section className="chart">
+            <div className="findings-col">
+              {result?.truncated && (
+                <div className="warn">
+                  Output was truncated — only complete findings were recovered. This run is
+                  incomplete, not empty.
+                </div>
+              )}
+              {!result && (
+                <p className="empty">
+                  No analysis yet. Note: <code>Run analysis</code> still analyzes the bundled
+                  synthetic FHIR case, not the selected folder case — the pipeline is not yet wired
+                  to <code>data/cases/</code>.
+                </p>
+              )}
+              <FindingsPanel findings={result?.findings ?? []} />
+              {result?.enrichment && <InferredPanel enrichment={result.enrichment} />}
+              <ActionLedger items={result?.action_ledger ?? []} />
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

@@ -62,3 +62,56 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .inferred__quote { margin: 0; padding: 0.4rem 0.7rem; border-left: 3px solid var(--muted); color: #cfd4dc; font-style: italic; font-size: 0.88rem; }
 .inferred__quote cite { display: block; font-style: normal; color: var(--muted); font-size: 0.72rem; margin-top: 0.3rem; }
 .badge--kind { background: #241a40; color: #c3a8fe; }
+
+/* --- patient browser ------------------------------------------------------ */
+.app__actions { display: flex; gap: 12px; align-items: center; }
+.viewswitch { display: flex; border: 1px solid var(--line, #d5d9e0); border-radius: 6px; overflow: hidden; }
+.viewswitch button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; font: inherit; }
+.viewswitch button.on { background: #1f2937; color: #fff; }
+
+.patients { width: 240px; flex: 0 0 240px; border-right: 1px solid var(--line, #d5d9e0); overflow-y: auto; }
+.patients__head { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #4b5563; margin: 0 0 8px; padding: 12px 12px 0; }
+.patients__list { list-style: none; margin: 0; padding: 0 8px 12px; }
+.patients__item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 6px; padding: 8px 10px; cursor: pointer; font: inherit; }
+.patients__item:hover { background: #f3f4f6; }
+.patients__item--on { background: #eef4ff; box-shadow: inset 2px 0 0 #2563eb; }
+.patients__name { font-weight: 600; }
+.patients__meta { font-size: 12px; color: #4b5563; }
+.patients__id { font-size: 11px; color: #4b5563; font-family: ui-monospace, monospace; }
+
+.chart { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.chart__head { padding: 14px 18px 10px; border-bottom: 1px solid var(--line, #d5d9e0); }
+.chart__head h2 { margin: 0 0 4px; font-size: 18px; }
+.chart__sub { display: flex; gap: 10px; align-items: center; margin: 0; font-size: 13px; color: #4b5563; }
+.chart__line { margin: 6px 0 0; font-size: 13px; color: #4b5563; }
+.pill { background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--line, #d5d9e0); }
+.tab { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 7px 12px; border-radius: 6px 6px 0 0; cursor: pointer; font: inherit; font-size: 13px; color: #4b5563; }
+.tab:hover { background: #f3f4f6; }
+.tab--on { background: #1f2937; color: #fff; }
+.tab__count { font-size: 11px; opacity: .7; }
+.tab--transcript { margin-left: auto; font-style: italic; }
+
+.folder { display: flex; flex: 1; min-height: 0; }
+.doclist { list-style: none; margin: 0; padding: 10px 8px; width: 260px; flex: 0 0 260px; border-right: 1px solid var(--line, #d5d9e0); overflow-y: auto; }
+.doclist__item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 6px; padding: 7px 9px; cursor: pointer; font: inherit; }
+.doclist__item:hover { background: #f3f4f6; }
+.doclist__item--on { background: #eef4ff; }
+.doclist__date { font-size: 11px; color: #4b5563; font-family: ui-monospace, monospace; }
+.doclist__title { font-size: 13px; line-height: 1.3; }
+
+.doc { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 22px; }
+.doc--solo { flex: 1; }
+.md h3 { font-size: 17px; margin: 0 0 4px; }
+.md h4 { font-size: 14px; margin: 16px 0 4px; }
+.md h5 { font-size: 13px; margin: 12px 0 4px; color: #4b5563; }
+.md p { margin: 8px 0; line-height: 1.55; }
+.md ul { margin: 8px 0; padding-left: 20px; line-height: 1.55; }
+.md hr { border: 0; border-top: 1px solid var(--line, #d5d9e0); margin: 14px 0; }
+.md-table-wrap { overflow-x: auto; margin: 10px 0; }
+.md-table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.md-table th, .md-table td { border: 1px solid var(--line, #d5d9e0); padding: 5px 9px; text-align: left; }
+.md-table th { background: #f8fafc; font-weight: 600; }
+
+.warn { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }

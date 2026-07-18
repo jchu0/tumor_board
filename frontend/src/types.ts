@@ -72,6 +72,7 @@ export interface AnalysisResult {
   enrichment: Enrichment;
   // Tools an inference triggered (raises_check) with results — these gate findings.
   triggered_checks: TriggeredCheck[];
+  truncated?: boolean;
 }
 
 export interface TranscriptLine {
@@ -93,4 +94,36 @@ export interface CaseResponse {
   case: Record<string, unknown>;
   completeness: MissingField[];
   transcript: TranscriptLine[];
+}
+
+// --- Patient data browser (data/cases/<case_id>/<specialty>/*.md) -------------
+
+export interface Document {
+  doc_id: string;
+  folder: string;
+  filename: string;
+  title: string;
+  date: string | null;
+  body: string;
+}
+
+export interface Folder {
+  name: string;
+  label: string;
+  documents: Document[];
+}
+
+export interface CaseSummary {
+  case_id: string;
+  cancer_type: string | null;
+  patient_ref: string | null;
+  line_of_therapy: string | null;
+  board_date: string | null;
+  folder_names: string[];
+  document_count: number;
+}
+
+export interface CaseDetail extends CaseSummary {
+  folders: Folder[];
+  transcript: string | null;
 }
