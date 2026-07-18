@@ -1,7 +1,7 @@
 # Multidisciplinary Tumor Board -- Transcript
-**Date:** 2026-07-09 | **Patient:** Sarah Mitchell (SYN-BR-00147) | **Case:** Progression on first-line endocrine + CDK4/6 inhibitor
+**Date:** 2026-07-09 | **Patient:** Dana Whitfield (SYN-BR-00231) | **Case:** Progression on first-line endocrine + CDK4/6 inhibitor
 
-1. ONCOLOGIST: Quick update on Ms. Mitchell -- only five weeks in on fulvestrant plus ribociclib and her marker's already climbing, new small liver lesion on the interval scan.
+1. ONCOLOGIST: Quick update on Ms. Whitfield -- only five weeks in on fulvestrant plus ribociclib and her marker's already climbing, new small liver lesion on the interval scan.
 2. RADIOLOGIST: Confirmed, one new sub-centimeter lesion, segment V. Everything else stable.
 3. NURSE_COORDINATOR: That's a fast progression for a first-line endocrine regimen.
 4. ONCOLOGIST: Agreed. Let's move her to capecitabine.

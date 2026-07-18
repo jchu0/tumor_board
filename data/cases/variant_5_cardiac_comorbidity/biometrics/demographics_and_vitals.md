@@ -1,6 +1,6 @@
 # Patient Biometrics & Demographics
-**Patient:** Sarah Mitchell | **DOB:** 1992-03-14 (Age 34) | **Sex:** Female
-**MRN:** SYN-BR-00147 (synthetic) | **Marital status:** Married | **Occupation:** High school teacher
+**Patient:** Maya Osei | **DOB:** 1957-09-19 (Age 68) | **Sex:** Female
+**MRN:** SYN-BR-00579 (synthetic) | **Marital status:** Widowed | **Occupation:** Retired librarian
 
 ## Vitals trend
 | Date | Weight | Height | BP | HR | ECOG |

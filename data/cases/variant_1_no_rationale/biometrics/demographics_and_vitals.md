@@ -1,13 +1,13 @@
 # Patient Biometrics & Demographics
-**Patient:** Sarah Mitchell | **DOB:** 1992-03-14 (Age 34) | **Sex:** Female
-**MRN:** SYN-BR-00147 (synthetic) | **Marital status:** Married | **Occupation:** High school teacher
+**Patient:** Dana Whitfield | **DOB:** 1978-06-21 (Age 48) | **Sex:** Female
+**MRN:** SYN-BR-00231 (synthetic) | **Marital status:** Married | **Occupation:** Logistics coordinator
 
 ## Vitals trend
 | Date | Weight | Height | BP | HR | ECOG |
 |---|---|---|---|---|---|
 | 2024-02-10 | 68 kg | 165 cm | 118/76 | 78 | 0 |
 | 2026-06-25 | 63 kg | 165 cm | 108/68 | 88 | 1 |
-| 2026-07-16 | 62 kg | 165 cm | 110/70 | 84 | 1 |
+| 2026-07-09 | 62 kg | 165 cm | 110/70 | 84 | 1 |
 
 ## Allergies
 No known drug allergies.

@@ -1,7 +1,7 @@
 {
   "case_id": "variant_2_stale_interaction",
   "cancer_type": "breast",
-  "patient_ref": "Sarah Mitchell (fork of hero case, later timepoint)",
+  "patient_ref": "Priya Raman, DOB 1965-11-08 (age 60)",
   "line_of_therapy": "Considering capecitabine re-challenge; incidental new anticoagulation",
   "board_date": "2026-07-16",
   "planted_gaps": [

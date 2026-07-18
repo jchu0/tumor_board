@@ -1,7 +1,7 @@
 {
   "case_id": "variant_1_no_rationale",
   "cancer_type": "breast",
-  "patient_ref": "Sarah Mitchell (fork of hero case, later timepoint)",
+  "patient_ref": "Dana Whitfield, DOB 1978-06-21 (age 48)",
   "line_of_therapy": "Progression on first-line endocrine + CDK4/6 inhibitor -- choosing next therapy",
   "board_date": "2026-07-09",
   "planted_gaps": [

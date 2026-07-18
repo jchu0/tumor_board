@@ -1,7 +1,7 @@
 # Multidisciplinary Tumor Board -- Transcript
-**Date:** 2026-07-16 | **Patient:** Sarah Mitchell (SYN-BR-00147) | **Case:** Progression, considering capecitabine, incidental new DVT/anticoagulation
+**Date:** 2026-07-16 | **Patient:** Priya Raman (SYN-BR-00318) | **Case:** Progression, considering capecitabine, incidental new DVT/anticoagulation
 
-1. ONCOLOGIST: Ms. Mitchell has been slowly progressing, and she was just started on warfarin last week for a DVT they caught at urgent care.
+1. ONCOLOGIST: Ms. Raman has been slowly progressing, and she was just started on warfarin last week for a DVT they caught at urgent care.
 2. NURSE_COORDINATOR: Right, popliteal DVT, she's on warfarin now, INR being followed by her PCP.
 3. ONCOLOGIST: Given the progression, I think it's time to move to capecitabine.
 4. PATHOLOGIST: No change in the biopsy findings to add here.

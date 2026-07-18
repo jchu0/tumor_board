@@ -1,7 +1,7 @@
 {
   "case_id": "variant_3_brca_pending",
   "cancer_type": "breast",
-  "patient_ref": "Sarah Mitchell (fork of hero case, later timepoint)",
+  "patient_ref": "Elena Vasquez, DOB 1983-04-02 (age 43)",
   "line_of_therapy": "Considering PARP-inhibitor trial (BR-1187); germline testing pending",
   "board_date": "2026-07-23",
   "planted_gaps": [
