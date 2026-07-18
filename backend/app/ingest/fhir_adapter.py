@@ -194,7 +194,7 @@ def _handle_condition(cond: dict, ref: str, case: TumorBoardCase) -> None:
         dx = case.diagnosis or Diagnosis()
         dx.primary_site = dx.primary_site or label
         dx.histology = dx.histology or label
-        dx.diagnosis_date = dx.diagnosis_date or cond.get("onsetDateTime")
+        dx.diagnosis_date = dx.diagnosis_date or _fhir_date(cond, "onsetDateTime", "onsetPeriod", "recordedDate")
         if cond.get("stage"):  # simplified synthetic carries a stage string
             dx.staging = dx.staging or Staging(overall_stage=str(cond["stage"]))
         dx.provenance = dx.provenance or prov
@@ -226,12 +226,27 @@ def _handle_diagnostic_report(rep: dict, ref: str, case: TumorBoardCase) -> None
     )
 
 
+def _fhir_date(resource: dict, *keys: str) -> str | None:
+    """First usable date across several FHIR spellings. Real records and
+    hand-authored ones disagree: the 25 Abridge records carry `performedPeriod`
+    (never `performedDateTime`), so reading only one spelling silently loses every
+    procedure date — and an undated procedure cannot invalidate a goals-of-care
+    record it actually postdates. Period types collapse to their start."""
+    for k in keys:
+        v = resource.get(k)
+        if isinstance(v, dict):                       # Period: {start, end}
+            v = v.get("start") or v.get("end")
+        if isinstance(v, str) and v.strip():
+            return v
+    return None
+
+
 def _handle_procedure(proc: dict, ref: str, case: TumorBoardCase) -> None:
     case.prior_treatments.append(
         PriorTreatment(
             name=_text(proc.get("code")) or "procedure",
             kind="procedure",
-            date=proc.get("performedDateTime"),
+            date=_fhir_date(proc, "performedDateTime", "performedPeriod", "occurrenceDateTime", "performedString"),
             provenance=_prov(proc, ref),
         )
     )
