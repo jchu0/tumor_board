@@ -89,3 +89,4 @@ class AnalyzeRequest(BaseModel):
     full FHIR-envelope record, else the bundled synthetic case."""
     case_id: Optional[str] = Field(None, description="A folder under data/cases/ to structure and analyze.")
     record: Optional[dict] = None
+    refresh: bool = Field(False, description="Bypass the cached result and recompute (case_id runs only).")

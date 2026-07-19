@@ -87,8 +87,21 @@ def run_enrichment(req: AnalyzeRequest) -> Enrichment:
     return enrich(case, transcript, free_text)
 
 
+import json as _json
+from pathlib import Path as _Path
+
+# A per-case result cache. Analysis is ~minutes; for the demo a click should be
+# instant. First run computes and caches; later clicks (or a pre-seeded cache)
+# return immediately. Pass {"refresh": true} to recompute.
+_CACHE_DIR = _Path(__file__).resolve().parents[2] / "output" / "cache"
+
+
 @app.post("/analyze", response_model=AnalysisResult)
 def run_analysis(req: AnalyzeRequest) -> AnalysisResult:
+    cache_file = _CACHE_DIR / f"{req.case_id}.json" if req.case_id else None
+    if cache_file and not req.refresh and cache_file.exists():
+        return AnalysisResult(**_json.loads(cache_file.read_text()))
+
     record, free_text = _inputs(req)
     case = ingest(record)
     transcript = parse_transcript(record.get("transcript", []))
@@ -96,12 +109,16 @@ def run_analysis(req: AnalyzeRequest) -> AnalysisResult:
     # it degrades to empty if there's no API key, so analysis still runs.
     enrichment = enrich(case, transcript, free_text)
     try:
-        return analyze(case, transcript, enrichment)
+        result = analyze(case, transcript, enrichment)
     except RuntimeError as e:
         # The orchestrator needs an API key; surface a clear 400 (config), not a 500.
         if "ANTHROPIC_API_KEY" in str(e):
             raise HTTPException(status_code=400, detail=str(e).splitlines()[0])
         raise
+    if cache_file:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(result.model_dump_json())
+    return result
 
 
 @app.get("/cases", response_model=list[CaseSummary])
