@@ -1,51 +1,55 @@
 import type { Finding } from "../types";
 
-// The two axes are shown SEPARATELY on purpose (README §5): evidence strength
-// vs. our confidence we matched it to the right patient.
-export function FindingCard({ f }: { f: Finding }) {
+// Scannable scaffold: each finding collapses to a one-line summary (issue + the
+// key badges) so the whole list reads at a glance, and expands to the full detail
+// (recommendation, patient note, live question, evidence) on click. Native
+// <details>/<summary> — accessible, no extra state.
+export function FindingCard({ f, index }: { f: Finding; index: number }) {
   const notConfirmed = f.operability_status === "not_confirmed";
   return (
-    <article className={`finding ${notConfirmed ? "finding--warn" : ""}`}>
-      <header className="finding__head">
-        <span className="finding__source">{f.source_agent}</span>
-        {f.recommendation_grade && (
-          <span className="badge badge--grade" title="Class of Recommendation / Level of Evidence">
-            {f.recommendation_grade}
+    <details className={`finding ${notConfirmed ? "finding--warn" : ""}`}>
+      <summary className="finding__summary">
+        <span className="finding__num">{index}</span>
+        <span className="finding__issue">{f.issue}</span>
+        <span className="finding__badges">
+          {f.recommendation_grade && (
+            <span className="badge badge--grade" title="Class of Recommendation / Level of Evidence">
+              {f.recommendation_grade}
+            </span>
+          )}
+          <span className="badge badge--match" title="Confidence this evidence fits THIS patient">
+            {Math.round(f.match_confidence * 100)}%
           </span>
-        )}
-        <span className="badge badge--match" title="Confidence this evidence fits THIS patient">
-          match {Math.round(f.match_confidence * 100)}%
+          {f.operability_status !== "not_applicable" && (
+            <span className={`badge badge--op-${f.operability_status}`}>
+              {f.operability_status.replace("_", " ")}
+            </span>
+          )}
         </span>
-        {f.operability_status !== "not_applicable" && (
-          <span className={`badge badge--op badge--op-${f.operability_status}`}>
-            operability: {f.operability_status.replace("_", " ")}
-          </span>
-        )}
-      </header>
+      </summary>
 
-      <h3 className="finding__issue">{f.issue}</h3>
-      <p className="finding__rec">{f.recommendation}</p>
-
-      <p className="finding__patient">
-        <strong>To address with the patient:</strong> {f.patient_facing_note}
-      </p>
-
-      <div className="finding__live">
-        <strong>Live question:</strong> {f.live_question}
+      <div className="finding__detail">
+        <p className="finding__source">{f.source_agent}</p>
+        <p className="finding__rec">{f.recommendation}</p>
+        <p className="finding__patient">
+          <strong>To address with the patient:</strong> {f.patient_facing_note}
+        </p>
+        <div className="finding__live">
+          <strong>Live question:</strong> {f.live_question}
+        </div>
+        <footer className="finding__foot">
+          <span>evidence: {f.evidence_ref}</span>
+          <span>rationale: {f.rationale_status.replace("_", " ")}</span>
+          {f.transcript_ref && (
+            <span>
+              {f.transcript_ref.line !== null
+                ? `line ${f.transcript_ref.line}`
+                : "absence (not discussed)"}
+              {f.transcript_ref.speaker ? ` · ${f.transcript_ref.speaker}` : ""}
+            </span>
+          )}
+        </footer>
       </div>
-
-      <footer className="finding__foot">
-        <span>evidence: {f.evidence_ref}</span>
-        <span>rationale: {f.rationale_status.replace("_", " ")}</span>
-        {f.transcript_ref && (
-          <span>
-            {f.transcript_ref.line !== null
-              ? `line ${f.transcript_ref.line}`
-              : "absence (not discussed)"}
-            {f.transcript_ref.speaker ? ` · ${f.transcript_ref.speaker}` : ""}
-          </span>
-        )}
-      </footer>
-    </article>
+    </details>
   );
 }

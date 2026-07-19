@@ -9,7 +9,7 @@ export function FindingsPanel({ findings }: { findings: Finding[] }) {
     <section className="panel">
       <h2>Findings ({findings.length})</h2>
       {findings.map((f, i) => (
-        <FindingCard key={i} f={f} />
+        <FindingCard key={i} f={f} index={i + 1} />
       ))}
     </section>
   );

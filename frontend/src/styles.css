@@ -127,8 +127,19 @@ code { background: var(--panel-2); border: 1px solid var(--border); border-radiu
 .tline { margin: 0.35rem 0; font-size: 0.9rem; line-height: 1.4; }
 .tline__meta { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
 
-.finding { border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.75rem; }
+/* Scannable finding: a one-line summary that expands to detail on click. */
+.finding { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 0.5rem; overflow: hidden; }
 .finding--warn { border-color: var(--warn); }
+.finding__summary { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem; cursor: pointer; list-style: none; }
+.finding__summary::-webkit-details-marker { display: none; }
+.finding__summary::before { content: "▸"; color: var(--muted); font-size: 0.75rem; flex-shrink: 0; transition: transform 0.15s; }
+.finding[open] > .finding__summary::before { transform: rotate(90deg); }
+.finding__summary:hover { background: rgba(255, 255, 255, 0.03); }
+.finding__num { color: var(--muted); font-size: 0.72rem; min-width: 1.1rem; flex-shrink: 0; text-align: right; }
+.finding__summary .finding__issue { flex: 1; margin: 0; font-size: 0.88rem; font-weight: 600; line-height: 1.35; }
+.finding__badges { display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0; }
+.finding__detail { padding: 0.1rem 0.85rem 0.8rem 2.3rem; border-top: 1px solid var(--border); }
+.finding__detail .finding__source { margin: 0.55rem 0 0.4rem; }
 .finding__head { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .finding__source { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; margin-right: auto; }
 .finding__issue { margin: 0.5rem 0 0.25rem; font-size: 1rem; }
