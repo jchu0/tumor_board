@@ -17,13 +17,10 @@ export function FindingCard({ f, index }: { f: Finding; index: number }) {
               {f.recommendation_grade}
             </span>
           )}
-          <span className="badge badge--match" title="Confidence this evidence fits THIS patient">
-            {Math.round(f.match_confidence * 100)}%
-          </span>
-          {f.operability_status !== "not_applicable" && (
-            <span className={`badge badge--op-${f.operability_status}`}>
-              {f.operability_status.replace("_", " ")}
-            </span>
+          {/* Only the deterministic safety warning — a surgical option the operability
+              check did NOT clear. "cleared" and the (non-deterministic) match% are dropped. */}
+          {f.operability_status === "not_confirmed" && (
+            <span className="badge badge--op-not_confirmed">operability not confirmed</span>
           )}
         </span>
       </summary>
