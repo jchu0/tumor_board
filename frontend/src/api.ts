@@ -9,13 +9,18 @@ export async function fetchCase(): Promise<CaseResponse> {
   return res.json();
 }
 
-export async function runAnalysis(): Promise<AnalysisResult> {
+export async function runAnalysis(caseId: string): Promise<AnalysisResult> {
   const res = await fetch(`${BASE}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}), // empty body → backend uses the bundled synthetic case
+    body: JSON.stringify({ case_id: caseId }), // analyze the selected data/cases patient
   });
-  if (!res.ok) throw new Error(`POST /analyze failed: ${res.status}`);
+  if (!res.ok) {
+    // surface the backend's reason (e.g. missing API key) instead of just the code
+    let detail = "";
+    try { detail = (await res.json()).detail || ""; } catch { /* noop */ }
+    throw new Error(`POST /analyze failed: ${res.status}${detail ? ` — ${detail}` : ""}`);
+  }
   return res.json();
 }
 

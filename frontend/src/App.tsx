@@ -36,10 +36,11 @@ export default function App() {
   }, [selected]);
 
   async function analyze() {
+    if (!selected) return;
     setLoading(true);
     setError(null);
     try {
-      setResult(await runAnalysis());
+      setResult(await runAnalysis(selected));
       setView("analysis");
     } catch (e) {
       setError(String(e));
@@ -91,9 +92,8 @@ export default function App() {
               )}
               {!result && (
                 <p className="empty">
-                  No analysis yet. Note: <code>Run analysis</code> still analyzes the bundled
-                  synthetic FHIR case, not the selected folder case — the pipeline is not yet wired
-                  to <code>data/cases/</code>.
+                  No analysis yet. Click <code>Run analysis</code> to analyze the selected
+                  patient — this runs the full pipeline and takes a bit.
                 </p>
               )}
               <FindingsPanel findings={result?.findings ?? []} />
