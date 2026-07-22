@@ -95,15 +95,61 @@ server that holds the API key and must run on a server host (Render, Railway, Fl
 The key stays a server-side environment variable — never in the repo or the browser.
 Full guide: [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-## Status & roadmap
+## Status
 
-Working: the full panel loop, the operability gate, the React UI, a mock-client
-regression test. Next up:
+**Working today:** the full panel loop (router → parallel specialists → reconcile →
+cross-examine → synthesis), the operability safety gate, bounded/cost-capped runs,
+the React UI with a board-deliberation view, and a mock-client regression test. It
+has been run live end-to-end on the bundled cases.
 
-- Goals-of-care as a second code-enforced gate (currently raised by a specialist).
-- A code-level check that every finding's cited evidence exists in the chart.
-- A benchmark harness scoring the panel against each case's planted gaps.
-- Per-specialist evidence-provider seam for real EBM/guideline retrieval.
+## Roadmap / TODO
+
+Grouped roughly by priority. Nothing here is required for the app to run — it works
+now — these are the paths to making it trustworthy, deeper, and shippable.
+
+### Correctness & safety (do these before trusting output clinically)
+- [ ] **Benchmark harness.** Run the panel across every `data/cases/*` and score
+      caught / missed / false-positive against each `case_meta.json`'s `planted_gaps`.
+      This is the "is the gap-detection actually good?" test — currently unanswered.
+- [ ] **Evidence-citation check in code.** Verify each finding's `evidence_ref`
+      actually resolves to a real chart document or transcript line, so a
+      hallucinated citation can't pass. (Charter says "no source, no finding" — make
+      it enforced, not just prompted.)
+- [ ] **Goals-of-care as a second hard gate.** Today `palliative_goc` raises it as a
+      specialist; promote it to a code-enforced precondition like operability, so an
+      escalating plan can't be surfaced clean against stale/absent documented wishes.
+
+### Knowledge depth (make the clinical reasoning stronger & current)
+- [ ] **Per-specialist `evidence_provider` seam → real EBM retrieval.** Swap the
+      oncology specialist's native knowledge for live guideline/trial sources
+      (e.g. ClinicalTrials.gov, curated guideline text). The orchestrator doesn't
+      change — this is the designed upgrade slot.
+- [ ] **Performance-status inference** from casual speech (ECOG/Karnofsky implied by
+      context, e.g. "she's still doing the school run") rather than only when stated.
+- [ ] **Specialist-to-specialist conversation.** Upgrade the broker-mediated debate
+      to bounded direct exchanges when a conflict needs real back-and-forth.
+- [ ] **Local practice-pattern memory** across sessions (framed as a QA/audit signal,
+      never pressure to conform — needs real governance if ever deployed).
+
+### Product & UI
+- [ ] **Evidence linking.** Click a finding → jump to the cited chart document /
+      transcript line in the Patient-chart view.
+- [ ] **Live run progress.** Stream specialists reporting in as they finish, instead
+      of one spinner for the whole ~1–2 min run.
+- [ ] **Result caching** per case, so re-opening a patient is instant.
+- [ ] **Chart-ready board summary note** export (an after-visit-summary for the board).
+
+### Infrastructure & ops
+- [ ] **Deploy it** (Render backend + GitHub Pages frontend) per `DEPLOYMENT.md`.
+- [ ] **Auth + rate limiting** on the public backend before it's internet-facing.
+- [ ] **Observability**: log model calls, latency, and cost per run.
+- [ ] **Real transcript ingestion** (live/streamed) rather than a static file.
+
+### Known limitations (be honest about these)
+- Gap-detection quality is **not yet validated** — no benchmark has been run.
+- Specialists reason from the model's **native knowledge**, which is not guaranteed
+  current or fully evidence-based until the EBM-retrieval seam lands.
+- All patient data here is **synthetic**; the trial/guideline content is illustrative.
 
 ## License
 
